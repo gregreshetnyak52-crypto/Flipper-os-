@@ -1,0 +1,41 @@
+name: Build FlipperOS firmware
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set version suffix
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "DIST_SUFFIX=flipperos-${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+          else
+            echo "DIST_SUFFIX=flipperos-${GITHUB_SHA::8}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build updater package
+        run: firmware/build.sh
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.DIST_SUFFIX }}
+          path: |
+            firmware/unleashed/dist/f7-C/flipper-z-f7-update-*.tgz
+            firmware/unleashed/dist/f7-C/flipper-z-f7-full-*.dfu
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            firmware/unleashed/dist/f7-C/flipper-z-f7-update-*.tgz
+            firmware/unleashed/dist/f7-C/flipper-z-f7-full-*.dfu
