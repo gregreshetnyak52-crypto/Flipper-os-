@@ -1,0 +1,13 @@
+App(
+    appid="flipper_os",
+    name="Flipper OS Toolkit",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="flipper_os_app",
+    requires=["gui", "notification"],
+    stack_size=4 * 1024,
+    fap_version="1.0",
+    fap_icon="flipper_os.png",
+    fap_category="Tools",
+    fap_author="gregreshetnyak52-crypto",
+    fap_description="Toolkit: stopwatch, dice, Morse beacon, Snake, tally counter and system info",
+)
