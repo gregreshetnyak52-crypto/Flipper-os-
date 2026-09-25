@@ -55,6 +55,8 @@ static FlipperOsApp* flipper_os_alloc(void) {
     app->snake = snake_alloc(settings);
     app->counter = counter_alloc(settings);
     app->sysinfo = sysinfo_alloc(settings);
+    app->settings_menu = settings_menu_alloc(settings);
+    app->about = about_alloc(settings);
 
     flipper_os_add_module(
         app, FlipperOsViewStopwatch, "Stopwatch", stopwatch_get_view(app->stopwatch));
@@ -69,6 +71,9 @@ static FlipperOsApp* flipper_os_alloc(void) {
         app, FlipperOsViewCounter, "Tally Counter", counter_get_view(app->counter));
     flipper_os_add_module(
         app, FlipperOsViewSysInfo, "System Info", sysinfo_get_view(app->sysinfo));
+    flipper_os_add_module(
+        app, FlipperOsViewSettings, "Settings", settings_menu_get_view(app->settings_menu));
+    flipper_os_add_module(app, FlipperOsViewAbout, "About", about_get_view(app->about));
 
     return app;
 }
@@ -89,6 +94,8 @@ static void flipper_os_free(FlipperOsApp* app) {
     snake_free(app->snake);
     counter_free(app->counter);
     sysinfo_free(app->sysinfo);
+    settings_menu_free(app->settings_menu);
+    about_free(app->about);
     submenu_free(app->menu);
 
     view_dispatcher_free(app->view_dispatcher);

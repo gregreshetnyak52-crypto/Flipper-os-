@@ -14,8 +14,8 @@
 #include "modules/snake.h"
 #include "modules/counter.h"
 #include "modules/sysinfo.h"
-
-#define FLIPPER_OS_VERSION "1.1"
+#include "modules/settings_menu.h"
+#include "modules/about.h"
 
 typedef enum {
     FlipperOsViewMenu,
@@ -27,6 +27,8 @@ typedef enum {
     FlipperOsViewSnake,
     FlipperOsViewCounter,
     FlipperOsViewSysInfo,
+    FlipperOsViewSettings,
+    FlipperOsViewAbout,
     FlipperOsViewCount,
 } FlipperOsView;
 
@@ -44,6 +46,8 @@ typedef struct {
     Snake* snake;
     Counter* counter;
     SysInfo* sysinfo;
+    SettingsMenu* settings_menu;
+    About* about;
 } FlipperOsApp;
 
 /** Previous-view callback shared by every module: Back returns to the main menu. */

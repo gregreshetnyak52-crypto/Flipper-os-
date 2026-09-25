@@ -9,7 +9,7 @@ App(
     order=85,
     requires=["gui", "notification", "storage"],
     stack_size=4 * 1024,
-    fap_version="1.1",
+    fap_version="1.2",
     fap_icon="flipper_os.png",
     fap_category="Tools",
     fap_author="gregreshetnyak52-crypto",

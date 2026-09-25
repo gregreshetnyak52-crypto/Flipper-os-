@@ -8,7 +8,7 @@
 #define FLIPPER_OS_SETTINGS_MAGIC 0x05
 #define FLIPPER_OS_SETTINGS_VERSION 1
 
-static void flipper_os_settings_defaults(FlipperOsSettings* settings) {
+void flipper_os_settings_defaults(FlipperOsSettings* settings) {
     memset(settings, 0, sizeof(FlipperOsSettings));
     settings->counter_step = 1;
     settings->dice_sides_index = 1; // d6

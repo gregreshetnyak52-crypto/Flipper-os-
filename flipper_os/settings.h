@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define FLIPPER_OS_VERSION "1.2"
+
 /**
  * Persistent state shared by all modules.
  *
@@ -26,3 +28,6 @@ typedef struct {
 
 void flipper_os_settings_load(FlipperOsSettings* settings);
 void flipper_os_settings_save(const FlipperOsSettings* settings);
+
+/** Reset to defaults in memory (does not touch the file on disk). */
+void flipper_os_settings_defaults(FlipperOsSettings* settings);
