@@ -124,7 +124,8 @@ static void stopwatch_exit_callback(void* context) {
     furi_timer_stop(instance->timer);
 }
 
-Stopwatch* stopwatch_alloc(void) {
+Stopwatch* stopwatch_alloc(FlipperOsSettings* settings) {
+    UNUSED(settings);
     Stopwatch* instance = malloc(sizeof(Stopwatch));
     instance->view = view_alloc();
     view_allocate_model(instance->view, ViewModelTypeLocking, sizeof(StopwatchModel));

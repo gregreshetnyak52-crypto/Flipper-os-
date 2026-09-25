@@ -44,15 +44,24 @@ static FlipperOsApp* flipper_os_alloc(void) {
     view_set_previous_callback(menu_view, flipper_os_exit);
     view_dispatcher_add_view(app->view_dispatcher, FlipperOsViewMenu, menu_view);
 
-    app->stopwatch = stopwatch_alloc();
-    app->dice = dice_alloc();
-    app->morse = morse_alloc();
-    app->snake = snake_alloc();
-    app->counter = counter_alloc();
-    app->sysinfo = sysinfo_alloc();
+    flipper_os_settings_load(&app->settings);
+    FlipperOsSettings* settings = &app->settings;
+
+    app->stopwatch = stopwatch_alloc(settings);
+    app->countdown = countdown_alloc(settings);
+    app->flashlight = flashlight_alloc(settings);
+    app->dice = dice_alloc(settings);
+    app->morse = morse_alloc(settings);
+    app->snake = snake_alloc(settings);
+    app->counter = counter_alloc(settings);
+    app->sysinfo = sysinfo_alloc(settings);
 
     flipper_os_add_module(
         app, FlipperOsViewStopwatch, "Stopwatch", stopwatch_get_view(app->stopwatch));
+    flipper_os_add_module(
+        app, FlipperOsViewCountdown, "Timer", countdown_get_view(app->countdown));
+    flipper_os_add_module(
+        app, FlipperOsViewFlashlight, "Flashlight", flashlight_get_view(app->flashlight));
     flipper_os_add_module(app, FlipperOsViewDice, "Dice Roller", dice_get_view(app->dice));
     flipper_os_add_module(app, FlipperOsViewMorse, "Morse Beacon", morse_get_view(app->morse));
     flipper_os_add_module(app, FlipperOsViewSnake, "Snake", snake_get_view(app->snake));
@@ -65,11 +74,16 @@ static FlipperOsApp* flipper_os_alloc(void) {
 }
 
 static void flipper_os_free(FlipperOsApp* app) {
-    for(uint32_t id = FlipperOsViewMenu; id <= FlipperOsViewSysInfo; id++) {
+    // Removing the views fires the active module's exit callback, which
+    // writes its state back into app->settings, so save only afterwards.
+    for(uint32_t id = FlipperOsViewMenu; id < FlipperOsViewCount; id++) {
         view_dispatcher_remove_view(app->view_dispatcher, id);
     }
+    flipper_os_settings_save(&app->settings);
 
     stopwatch_free(app->stopwatch);
+    countdown_free(app->countdown);
+    flashlight_free(app->flashlight);
     dice_free(app->dice);
     morse_free(app->morse);
     snake_free(app->snake);

@@ -16,6 +16,7 @@ struct Dice {
     View* view;
     FuriTimer* timer;
     NotificationApp* notifications;
+    FlipperOsSettings* settings;
 };
 
 typedef struct {
@@ -142,11 +143,20 @@ static void dice_timer_callback(void* context) {
 static void dice_exit_callback(void* context) {
     Dice* instance = context;
     furi_timer_stop(instance->timer);
-    with_view_model(instance->view, DiceModel * model, { model->frames_left = 0; }, false);
+    with_view_model(
+        instance->view,
+        DiceModel * model,
+        {
+            model->frames_left = 0;
+            instance->settings->dice_sides_index = model->sides_index;
+            instance->settings->dice_count = model->count;
+        },
+        false);
 }
 
-Dice* dice_alloc(void) {
+Dice* dice_alloc(FlipperOsSettings* settings) {
     Dice* instance = malloc(sizeof(Dice));
+    instance->settings = settings;
     instance->notifications = furi_record_open(RECORD_NOTIFICATION);
     instance->view = view_alloc();
     view_allocate_model(instance->view, ViewModelTypeLocking, sizeof(DiceModel));
@@ -160,8 +170,12 @@ Dice* dice_alloc(void) {
         instance->view,
         DiceModel * model,
         {
-            model->sides_index = 1; // d6
-            model->count = 1;
+            model->sides_index = settings->dice_sides_index < DICE_SIDES_COUNT ?
+                                     settings->dice_sides_index :
+                                     1;
+            model->count = settings->dice_count >= 1 && settings->dice_count <= DICE_MAX_COUNT ?
+                               settings->dice_count :
+                               1;
         },
         false);
     return instance;

@@ -9,6 +9,7 @@
 struct Counter {
     View* view;
     NotificationApp* notifications;
+    FlipperOsSettings* settings;
 };
 
 typedef struct {
@@ -77,20 +78,34 @@ static bool counter_input_callback(InputEvent* event, void* context) {
     return consumed;
 }
 
-Counter* counter_alloc(void) {
+static void counter_exit_callback(void* context) {
+    Counter* instance = context;
+    with_view_model(
+        instance->view,
+        CounterModel * model,
+        {
+            instance->settings->counter_value = model->value;
+            instance->settings->counter_step = model->step;
+        },
+        false);
+}
+
+Counter* counter_alloc(FlipperOsSettings* settings) {
     Counter* instance = malloc(sizeof(Counter));
+    instance->settings = settings;
     instance->notifications = furi_record_open(RECORD_NOTIFICATION);
     instance->view = view_alloc();
     view_allocate_model(instance->view, ViewModelTypeLocking, sizeof(CounterModel));
     view_set_context(instance->view, instance);
     view_set_draw_callback(instance->view, counter_draw_callback);
     view_set_input_callback(instance->view, counter_input_callback);
+    view_set_exit_callback(instance->view, counter_exit_callback);
     with_view_model(
         instance->view,
         CounterModel * model,
         {
-            model->value = 0;
-            model->step = 1;
+            model->value = CLAMP(settings->counter_value, COUNTER_MAX, -COUNTER_MAX);
+            model->step = CLAMP(settings->counter_step, 100, 1);
         },
         false);
     return instance;

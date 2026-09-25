@@ -102,7 +102,8 @@ static void sysinfo_exit_callback(void* context) {
     furi_timer_stop(instance->timer);
 }
 
-SysInfo* sysinfo_alloc(void) {
+SysInfo* sysinfo_alloc(FlipperOsSettings* settings) {
+    UNUSED(settings);
     SysInfo* instance = malloc(sizeof(SysInfo));
     instance->view = view_alloc();
     view_allocate_model(instance->view, ViewModelTypeLocking, sizeof(SysInfoModel));

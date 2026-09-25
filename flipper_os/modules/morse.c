@@ -76,6 +76,7 @@ struct Morse {
     View* view;
     FuriTimer* timer;
     NotificationApp* notifications;
+    FlipperOsSettings* settings;
     // Pre-rendered on/off pattern, one entry per time unit
     bool units[MORSE_MAX_UNITS];
     uint16_t units_count;
@@ -248,12 +249,22 @@ static void morse_timer_callback(void* context) {
 
 static void morse_exit_callback(void* context) {
     Morse* instance = context;
-    with_view_model(instance->view, MorseModel * model, { model->playing = false; }, false);
+    with_view_model(
+        instance->view,
+        MorseModel * model,
+        {
+            model->playing = false;
+            instance->settings->morse_message = model->message_index;
+            instance->settings->morse_output = model->output;
+            instance->settings->morse_loop = model->loop;
+        },
+        false);
     morse_stop(instance);
 }
 
-Morse* morse_alloc(void) {
+Morse* morse_alloc(FlipperOsSettings* settings) {
     Morse* instance = malloc(sizeof(Morse));
+    instance->settings = settings;
     instance->notifications = furi_record_open(RECORD_NOTIFICATION);
     instance->units_count = 0;
     instance->output_on = false;
@@ -264,6 +275,18 @@ Morse* morse_alloc(void) {
     view_set_input_callback(instance->view, morse_input_callback);
     view_set_exit_callback(instance->view, morse_exit_callback);
     instance->timer = furi_timer_alloc(morse_timer_callback, FuriTimerTypePeriodic, instance);
+
+    with_view_model(
+        instance->view,
+        MorseModel * model,
+        {
+            model->message_index =
+                settings->morse_message < MORSE_MESSAGES_COUNT ? settings->morse_message : 0;
+            model->output =
+                settings->morse_output < MorseOutputCount ? settings->morse_output : MorseOutputLed;
+            model->loop = settings->morse_loop;
+        },
+        false);
     return instance;
 }
 

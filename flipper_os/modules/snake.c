@@ -36,6 +36,7 @@ struct Snake {
     View* view;
     FuriTimer* timer;
     NotificationApp* notifications;
+    FlipperOsSettings* settings;
 };
 
 typedef struct {
@@ -247,12 +248,14 @@ static void snake_exit_callback(void* context) {
         SnakeModel * model,
         {
             if(model->state == SnakeStatePlaying) model->state = SnakeStatePaused;
+            instance->settings->snake_best = model->best;
         },
         false);
 }
 
-Snake* snake_alloc(void) {
+Snake* snake_alloc(FlipperOsSettings* settings) {
     Snake* instance = malloc(sizeof(Snake));
+    instance->settings = settings;
     instance->notifications = furi_record_open(RECORD_NOTIFICATION);
     instance->view = view_alloc();
     view_allocate_model(instance->view, ViewModelTypeLocking, sizeof(SnakeModel));
@@ -266,7 +269,7 @@ Snake* snake_alloc(void) {
         instance->view,
         SnakeModel * model,
         {
-            model->best = 0;
+            model->best = settings->snake_best;
             model->state = SnakeStateReady;
             snake_reset(model);
         },

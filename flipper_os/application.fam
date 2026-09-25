@@ -1,13 +1,17 @@
 App(
     appid="flipper_os",
-    name="Flipper OS Toolkit",
-    apptype=FlipperAppType.EXTERNAL,
+    name="Flipper OS",
+    # MENUEXTERNAL: in the FlipperOS firmware the app gets its own main menu
+    # entry (icon below); ufbt still builds it as a regular .fap.
+    apptype=FlipperAppType.MENUEXTERNAL,
     entry_point="flipper_os_app",
-    requires=["gui", "notification"],
+    icon="A_FlipperOS_14",
+    order=85,
+    requires=["gui", "notification", "storage"],
     stack_size=4 * 1024,
-    fap_version="1.0",
+    fap_version="1.1",
     fap_icon="flipper_os.png",
     fap_category="Tools",
     fap_author="gregreshetnyak52-crypto",
-    fap_description="Toolkit: stopwatch, dice, Morse beacon, Snake, tally counter and system info",
+    fap_description="Toolkit: stopwatch, timer, flashlight, dice, Morse beacon, Snake, tally counter and system info",
 )
