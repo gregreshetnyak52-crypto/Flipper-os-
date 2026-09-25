@@ -140,6 +140,23 @@ static void dice_timer_callback(void* context) {
     }
 }
 
+static void dice_enter_callback(void* context) {
+    Dice* instance = context;
+    FlipperOsSettings* settings = instance->settings;
+    with_view_model(
+        instance->view,
+        DiceModel * model,
+        {
+            model->sides_index = settings->dice_sides_index < DICE_SIDES_COUNT ?
+                                     settings->dice_sides_index :
+                                     1;
+            model->count = settings->dice_count >= 1 && settings->dice_count <= DICE_MAX_COUNT ?
+                               settings->dice_count :
+                               1;
+        },
+        true);
+}
+
 static void dice_exit_callback(void* context) {
     Dice* instance = context;
     furi_timer_stop(instance->timer);
@@ -163,21 +180,9 @@ Dice* dice_alloc(FlipperOsSettings* settings) {
     view_set_context(instance->view, instance);
     view_set_draw_callback(instance->view, dice_draw_callback);
     view_set_input_callback(instance->view, dice_input_callback);
+    view_set_enter_callback(instance->view, dice_enter_callback);
     view_set_exit_callback(instance->view, dice_exit_callback);
     instance->timer = furi_timer_alloc(dice_timer_callback, FuriTimerTypePeriodic, instance);
-
-    with_view_model(
-        instance->view,
-        DiceModel * model,
-        {
-            model->sides_index = settings->dice_sides_index < DICE_SIDES_COUNT ?
-                                     settings->dice_sides_index :
-                                     1;
-            model->count = settings->dice_count >= 1 && settings->dice_count <= DICE_MAX_COUNT ?
-                               settings->dice_count :
-                               1;
-        },
-        false);
     return instance;
 }
 

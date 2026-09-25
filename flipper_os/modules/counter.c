@@ -78,6 +78,18 @@ static bool counter_input_callback(InputEvent* event, void* context) {
     return consumed;
 }
 
+static void counter_enter_callback(void* context) {
+    Counter* instance = context;
+    with_view_model(
+        instance->view,
+        CounterModel * model,
+        {
+            model->value = CLAMP(instance->settings->counter_value, COUNTER_MAX, -COUNTER_MAX);
+            model->step = CLAMP(instance->settings->counter_step, 100, 1);
+        },
+        true);
+}
+
 static void counter_exit_callback(void* context) {
     Counter* instance = context;
     with_view_model(
@@ -99,15 +111,8 @@ Counter* counter_alloc(FlipperOsSettings* settings) {
     view_set_context(instance->view, instance);
     view_set_draw_callback(instance->view, counter_draw_callback);
     view_set_input_callback(instance->view, counter_input_callback);
+    view_set_enter_callback(instance->view, counter_enter_callback);
     view_set_exit_callback(instance->view, counter_exit_callback);
-    with_view_model(
-        instance->view,
-        CounterModel * model,
-        {
-            model->value = CLAMP(settings->counter_value, COUNTER_MAX, -COUNTER_MAX);
-            model->step = CLAMP(settings->counter_step, 100, 1);
-        },
-        false);
     return instance;
 }
 

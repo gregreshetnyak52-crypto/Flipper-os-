@@ -198,6 +198,24 @@ static bool flashlight_input_callback(InputEvent* event, void* context) {
     return consumed;
 }
 
+static void flashlight_enter_callback(void* context) {
+    Flashlight* instance = context;
+    FlipperOsSettings* settings = instance->settings;
+    with_view_model(
+        instance->view,
+        FlashlightModel * model,
+        {
+            model->on = false;
+            model->level = settings->flashlight_level < FLASHLIGHT_LEVELS ?
+                               settings->flashlight_level :
+                               FLASHLIGHT_LEVELS - 1;
+            model->mode = settings->flashlight_mode < FlashlightModeCount ?
+                              settings->flashlight_mode :
+                              FlashlightModeSteady;
+        },
+        true);
+}
+
 static void flashlight_exit_callback(void* context) {
     Flashlight* instance = context;
     // Never leave the light burning once the user leaves the screen
@@ -223,23 +241,10 @@ Flashlight* flashlight_alloc(FlipperOsSettings* settings) {
     view_set_context(instance->view, instance);
     view_set_draw_callback(instance->view, flashlight_draw_callback);
     view_set_input_callback(instance->view, flashlight_input_callback);
+    view_set_enter_callback(instance->view, flashlight_enter_callback);
     view_set_exit_callback(instance->view, flashlight_exit_callback);
     instance->timer =
         furi_timer_alloc(flashlight_timer_callback, FuriTimerTypePeriodic, instance);
-
-    with_view_model(
-        instance->view,
-        FlashlightModel * model,
-        {
-            model->on = false;
-            model->level = settings->flashlight_level < FLASHLIGHT_LEVELS ?
-                               settings->flashlight_level :
-                               FLASHLIGHT_LEVELS - 1;
-            model->mode = settings->flashlight_mode < FlashlightModeCount ?
-                              settings->flashlight_mode :
-                              FlashlightModeSteady;
-        },
-        false);
     return instance;
 }
 

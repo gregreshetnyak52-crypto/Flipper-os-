@@ -3,7 +3,8 @@
 #include <furi.h>
 #include <gui/elements.h>
 
-#define STOPWATCH_LAPS_MAX 2
+#define STOPWATCH_LAPS_MAX 50
+#define STOPWATCH_LAPS_VISIBLE 2
 #define STOPWATCH_REFRESH_MS 50
 
 struct Stopwatch {
@@ -15,8 +16,11 @@ typedef struct {
     bool running;
     uint32_t start_tick;
     uint32_t accumulated_ms;
+    // Elapsed time at each lap mark; once full the oldest lap is dropped
     uint32_t laps[STOPWATCH_LAPS_MAX];
     uint8_t lap_count;
+    uint16_t lap_dropped; // number of the oldest stored lap minus one
+    uint8_t scroll; // 0 shows the newest laps
 } StopwatchModel;
 
 static uint32_t stopwatch_ticks_to_ms(uint32_t ticks) {
@@ -42,6 +46,22 @@ static void stopwatch_format(char* buf, size_t size, uint32_t ms) {
         (unsigned long)hundredths);
 }
 
+// Callers skip index 0 once older laps were dropped: its split is unknown
+static uint32_t stopwatch_lap_split(const StopwatchModel* model, uint8_t index) {
+    return index == 0 ? model->laps[0] : model->laps[index] - model->laps[index - 1];
+}
+
+// Compact m:ss.hh form for the lap list
+static void stopwatch_format_short(char* buf, size_t size, uint32_t ms) {
+    snprintf(
+        buf,
+        size,
+        "%lu:%02lu.%02lu",
+        (unsigned long)(ms / 60000),
+        (unsigned long)((ms / 1000) % 60),
+        (unsigned long)((ms / 10) % 100));
+}
+
 static void stopwatch_draw_callback(Canvas* canvas, void* _model) {
     StopwatchModel* model = _model;
     char buf[24];
@@ -55,11 +75,44 @@ static void stopwatch_draw_callback(Canvas* canvas, void* _model) {
     canvas_draw_str_aligned(canvas, 64, 26, AlignCenter, AlignCenter, buf);
 
     canvas_set_font(canvas, FontSecondary);
-    for(uint8_t i = 0; i < model->lap_count; i++) {
-        char lap[40];
-        stopwatch_format(buf, sizeof(buf), model->laps[i]);
-        snprintf(lap, sizeof(lap), "Lap %u: %s", i + 1, buf);
-        canvas_draw_str_aligned(canvas, 64, 34 + i * 9, AlignCenter, AlignTop, lap);
+    if(model->lap_count > 0) {
+        // Fastest lap, ignoring the first stored one if its split is unknown
+        uint8_t fastest = model->lap_dropped ? 1 : 0;
+        for(uint8_t i = fastest + 1; i < model->lap_count; i++) {
+            if(stopwatch_lap_split(model, i) < stopwatch_lap_split(model, fastest)) fastest = i;
+        }
+
+        // Newest first, scrolled by model->scroll
+        for(uint8_t row = 0; row < STOPWATCH_LAPS_VISIBLE; row++) {
+            if(model->scroll + row >= model->lap_count) break;
+            uint8_t i = model->lap_count - 1 - model->scroll - row;
+            char split[24];
+            char line[64];
+            stopwatch_format_short(buf, sizeof(buf), model->laps[i]);
+            if(i == 0 && model->lap_dropped) {
+                snprintf(line, sizeof(line), "#%u %s", model->lap_dropped + i + 1, buf);
+            } else {
+                stopwatch_format_short(split, sizeof(split), stopwatch_lap_split(model, i));
+                snprintf(
+                    line,
+                    sizeof(line),
+                    "%s#%u %s +%s",
+                    i == fastest && model->lap_count > 1 ? "*" : "",
+                    model->lap_dropped + i + 1,
+                    buf,
+                    split);
+            }
+            canvas_draw_str_aligned(canvas, 62, 34 + row * 9, AlignCenter, AlignTop, line);
+        }
+        if(model->lap_count > STOPWATCH_LAPS_VISIBLE) {
+            elements_scrollbar_pos(
+                canvas,
+                127,
+                33,
+                18,
+                model->scroll,
+                model->lap_count - STOPWATCH_LAPS_VISIBLE + 1);
+        }
     }
 
     elements_button_center(canvas, model->running ? "Stop" : "Start");
@@ -68,7 +121,9 @@ static void stopwatch_draw_callback(Canvas* canvas, void* _model) {
 
 static bool stopwatch_input_callback(InputEvent* event, void* context) {
     Stopwatch* instance = context;
-    if(event->type != InputTypeShort) return false;
+    bool repeat = event->type == InputTypeRepeat &&
+                  (event->key == InputKeyUp || event->key == InputKeyDown);
+    if(event->type != InputTypeShort && !repeat) return false;
 
     bool consumed = false;
     with_view_model(
@@ -92,12 +147,21 @@ static bool stopwatch_input_callback(InputEvent* event, void* context) {
                             model->laps, model->laps + 1,
                             sizeof(uint32_t) * (STOPWATCH_LAPS_MAX - 1));
                         model->lap_count--;
+                        model->lap_dropped++;
                     }
                     model->laps[model->lap_count++] = stopwatch_elapsed_ms(model);
                 } else {
                     model->accumulated_ms = 0;
                     model->lap_count = 0;
+                    model->lap_dropped = 0;
                 }
+                model->scroll = 0;
+                consumed = true;
+            } else if(event->key == InputKeyUp) {
+                if(model->scroll > 0) model->scroll--;
+                consumed = true;
+            } else if(event->key == InputKeyDown) {
+                if(model->scroll + STOPWATCH_LAPS_VISIBLE < model->lap_count) model->scroll++;
                 consumed = true;
             }
         },

@@ -48,7 +48,13 @@ typedef struct {
     SnakeState state;
     uint16_t score;
     uint16_t best;
+    uint16_t best_walls;
+    bool walls; // hitting the border ends the game instead of wrapping
 } SnakeModel;
+
+static uint16_t* snake_best(SnakeModel* model) {
+    return model->walls ? &model->best_walls : &model->best;
+}
 
 static uint32_t snake_period_ms(const SnakeModel* model) {
     int32_t period = SNAKE_SPEED_START_MS - (int32_t)model->score * 5;
@@ -95,6 +101,17 @@ static void snake_reset(SnakeModel* model) {
 static bool snake_step(SnakeModel* model) {
     model->dir = model->next_dir;
     SnakePoint head = model->body[0];
+
+    bool hit_wall = (model->dir == SnakeDirUp && head.y == 0) ||
+                    (model->dir == SnakeDirDown && head.y == SNAKE_ROWS - 1) ||
+                    (model->dir == SnakeDirLeft && head.x == 0) ||
+                    (model->dir == SnakeDirRight && head.x == SNAKE_COLS - 1);
+    if(model->walls && hit_wall) {
+        model->state = SnakeStateGameOver;
+        if(model->score > *snake_best(model)) *snake_best(model) = model->score;
+        return false;
+    }
+
     switch(model->dir) {
     case SnakeDirUp:
         head.y = (head.y + SNAKE_ROWS - 1) % SNAKE_ROWS;
@@ -115,7 +132,7 @@ static bool snake_step(SnakeModel* model) {
     uint16_t check_len = ate ? model->length : model->length - 1;
     if(snake_occupies(model, head, check_len)) {
         model->state = SnakeStateGameOver;
-        if(model->score > model->best) model->best = model->score;
+        if(model->score > *snake_best(model)) *snake_best(model) = model->score;
         return false;
     }
 
@@ -138,8 +155,9 @@ static void snake_draw_callback(Canvas* canvas, void* _model) {
     canvas_set_font(canvas, FontSecondary);
     snprintf(buf, sizeof(buf), "Score: %u", model->score);
     canvas_draw_str(canvas, 1, 7, buf);
-    snprintf(buf, sizeof(buf), "Best: %u", model->best);
+    snprintf(buf, sizeof(buf), "Best: %u", *snake_best(model));
     canvas_draw_str_aligned(canvas, 127, 7, AlignRight, AlignBottom, buf);
+    if(model->walls) canvas_draw_str_aligned(canvas, 64, 7, AlignCenter, AlignBottom, "Walls");
 
     for(uint16_t i = 0; i < model->length; i++) {
         canvas_draw_box(
@@ -168,6 +186,17 @@ static void snake_draw_callback(Canvas* canvas, void* _model) {
         canvas_set_color(canvas, ColorBlack);
         canvas_draw_frame(canvas, 64 - w / 2, 26, w, 14);
         canvas_draw_str_aligned(canvas, 64, 33, AlignCenter, AlignCenter, message);
+
+        if(model->state != SnakeStatePaused) {
+            // Mode can only be changed between games
+            canvas_set_font(canvas, FontSecondary);
+            const char* hint = "Up/Down: walls or wrap";
+            uint16_t hw = canvas_string_width(canvas, hint) + 6;
+            canvas_set_color(canvas, ColorWhite);
+            canvas_draw_box(canvas, 64 - hw / 2, 42, hw, 10);
+            canvas_set_color(canvas, ColorBlack);
+            canvas_draw_str_aligned(canvas, 64, 47, AlignCenter, AlignCenter, hint);
+        }
     }
 }
 
@@ -195,6 +224,11 @@ static bool snake_input_callback(InputEvent* event, void* context) {
                         period = snake_period_ms(model);
                     }
                 }
+            } else if(
+                event->type == InputTypeShort &&
+                (event->key == InputKeyUp || event->key == InputKeyDown) &&
+                (model->state == SnakeStateReady || model->state == SnakeStateGameOver)) {
+                model->walls = !model->walls;
             } else if(event->type == InputTypePress && model->state == SnakeStatePlaying) {
                 // React on press (not release) so steering feels responsive
                 SnakeDir dir = model->dir;
@@ -249,8 +283,25 @@ static void snake_exit_callback(void* context) {
         {
             if(model->state == SnakeStatePlaying) model->state = SnakeStatePaused;
             instance->settings->snake_best = model->best;
+            instance->settings->snake_best_walls = model->best_walls;
+            instance->settings->snake_walls = model->walls;
         },
         false);
+}
+
+static void snake_enter_callback(void* context) {
+    Snake* instance = context;
+    // Records may have been reset from Settings in the meantime
+    with_view_model(
+        instance->view,
+        SnakeModel * model,
+        {
+            model->best = instance->settings->snake_best;
+            model->best_walls = instance->settings->snake_best_walls;
+            // Keep the mode of a paused game, the board depends on it
+            if(model->state != SnakeStatePaused) model->walls = instance->settings->snake_walls;
+        },
+        true);
 }
 
 Snake* snake_alloc(FlipperOsSettings* settings) {
@@ -262,6 +313,7 @@ Snake* snake_alloc(FlipperOsSettings* settings) {
     view_set_context(instance->view, instance);
     view_set_draw_callback(instance->view, snake_draw_callback);
     view_set_input_callback(instance->view, snake_input_callback);
+    view_set_enter_callback(instance->view, snake_enter_callback);
     view_set_exit_callback(instance->view, snake_exit_callback);
     instance->timer = furi_timer_alloc(snake_timer_callback, FuriTimerTypePeriodic, instance);
 
@@ -269,7 +321,6 @@ Snake* snake_alloc(FlipperOsSettings* settings) {
         instance->view,
         SnakeModel * model,
         {
-            model->best = settings->snake_best;
             model->state = SnakeStateReady;
             snake_reset(model);
         },
