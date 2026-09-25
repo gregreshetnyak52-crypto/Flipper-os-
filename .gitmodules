@@ -2,4 +2,3 @@
 	path = firmware/unleashed
 	url = https://github.com/DarkFlippers/unleashed-firmware
 	shallow = true
-	ignore = dirty
