@@ -19,10 +19,28 @@ jobs:
       contents: write # create the tag and the release
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # tags and history, to find new release notes
+
+      # A push to main that adds or edits docs/releases/<tag>.md releases
+      # <tag>, unless that tag already exists
+      - name: Find release notes in this push
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          git cat-file -e "$BEFORE^{commit}" 2>/dev/null || exit 0
+          for notes in $(git diff --name-only --diff-filter=AM "$BEFORE" "$GITHUB_SHA" -- 'docs/releases/v*.md'); do
+            tag="$(basename "$notes" .md)"
+            if [[ "$tag" =~ ^v[0-9A-Za-z._-]+$ ]] && ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+              echo "Releasing $tag"
+              echo "NOTES_TAG=$tag" >> "$GITHUB_ENV"
+            fi
+          done
 
       - name: Set version suffix
         env:
-          INPUT_TAG: ${{ inputs.release_tag }}
+          INPUT_TAG: ${{ inputs.release_tag || env.NOTES_TAG }}
         run: |
           if [[ -n "$INPUT_TAG" ]]; then
             if [[ ! "$INPUT_TAG" =~ ^v[0-9A-Za-z._-]+$ ]]; then
