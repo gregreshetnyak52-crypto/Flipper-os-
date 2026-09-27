@@ -15,6 +15,18 @@
 - **CI**: GitHub Actions собирает пакет обновления на каждый пуш, а для тега
   `v*` публикует релиз.
 
+## Patrol — журнал обходов с защитой от подделки
+
+Отдельное приложение [`patrol/`](patrol/README.md), тоже встроенное в прошивку
+(**Apps → Tools → Patrol**): Flipper становится считывателем для обходов
+охраны и регламентных осмотров. Охранник прикладывает Flipper к NFC-, RFID-
+или iButton-меткам маршрута, каждая запись журнала подписана
+HMAC-SHA-256 по цепочке, ключ зашифрован анклавом устройства, а
+руководитель проверяет журнал офлайн-страницей
+[`companion/patrol-report.html`](companion/patrol-report.html).
+Анализ рынка и варианты монетизации — в
+[`docs/PATROL_BUSINESS.md`](docs/PATROL_BUSINESS.md).
+
 ## Flipper OS Toolkit
 
 | Модуль | Что делает | Управление |
@@ -151,7 +163,11 @@ firmware/
 ├── patches/                *.patch к исходникам Unleashed (см. README там)
 │   └── 0001-flipperos-desktop-animation.patch   анимация в манифесте дельфина
 ├── tools/make_animation.py генератор кадров анимации (нужен Pillow)
-└── build.sh                сброс → патчи → overlay → приложение → ./fbt
+└── build.sh                сброс → патчи → overlay → приложения → ./fbt
+patrol/                     приложение Patrol (журнал обходов)
+companion/patrol-report.html  офлайн-проверка журналов Patrol
+tests/run_patrol_tests.sh   тесты HMAC и проверки журналов
+docs/PATROL_BUSINESS.md     анализ рынка и монетизация
 ```
 
 Unleashed не копируется в репозиторий целиком, а подключён субмодулем.

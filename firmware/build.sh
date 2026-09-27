@@ -34,6 +34,7 @@ fi
 echo "==> Copying overlay and apps"
 cp -r "$ROOT/firmware/overlay/." "$FW/"
 cp -r "$ROOT/flipper_os" "$FW/applications_user/"
+cp -r "$ROOT/patrol" "$FW/applications_user/"
 
 cd "$FW"
 if (($# == 0)); then
