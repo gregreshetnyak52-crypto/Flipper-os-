@@ -1,0 +1,13 @@
+App(
+    appid="patrol",
+    name="Patrol",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="patrol_app",
+    requires=["gui", "notification", "storage"],
+    stack_size=4 * 1024,
+    fap_version="1.0",
+    fap_icon="patrol_10px.png",
+    fap_category="Tools",
+    fap_author="gregreshetnyak52-crypto",
+    fap_description="Guard tour and inspection rounds: tap NFC, 125 kHz RFID or iButton checkpoints, get a tamper-evident HMAC-signed log",
+)

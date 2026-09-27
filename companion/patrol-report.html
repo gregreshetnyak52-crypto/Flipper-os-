@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Patrol Report</title>
+<style>
+  :root {
+    --bg: #f6f5f1;
+    --panel: #ffffff;
+    --text: #1d1d1b;
+    --muted: #6b6a64;
+    --line: #dedcd4;
+    --accent: #e8590c;
+    --ok: #2b8a3e;
+    --ok-bg: #e9f5ec;
+    --bad: #c92a2a;
+    --bad-bg: #fbeaea;
+    --warn: #a86400;
+    --warn-bg: #fff4de;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151514;
+      --panel: #1f1f1d;
+      --text: #ecebe6;
+      --muted: #a09f98;
+      --line: #34332f;
+      --accent: #ff8a3d;
+      --ok: #69db7c;
+      --ok-bg: #1d3323;
+      --bad: #ff8787;
+      --bad-bg: #3a1f1f;
+      --warn: #ffc15e;
+      --warn-bg: #3a2e17;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h1 span { color: var(--accent); }
+  h2 { font-size: 17px; margin: 28px 0 10px; }
+  p.lead { color: var(--muted); margin: 0 0 20px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .inputs { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+  .inputs .wide { grid-column: 1 / -1; }
+  label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+  label small { font-weight: 400; color: var(--muted); }
+  input[type="text"], input[type="password"] {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  input[type="file"] { width: 100%; font-size: 13px; }
+  .drop {
+    border: 1.5px dashed var(--line);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .drop.over { border-color: var(--accent); }
+  button {
+    border: 0;
+    border-radius: 7px;
+    padding: 10px 16px;
+    font: 600 14px system-ui, sans-serif;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .card .v { font-size: 24px; font-weight: 700; }
+  .card .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .verdict { border-radius: 10px; padding: 14px 16px; font-weight: 600; margin-bottom: 12px; }
+  .verdict.ok { background: var(--ok-bg); color: var(--ok); }
+  .verdict.bad { background: var(--bad-bg); color: var(--bad); }
+  .verdict.warn { background: var(--warn-bg); color: var(--warn); }
+  .verdict small { display: block; font-weight: 400; color: var(--text); margin-top: 4px; }
+  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; background: var(--panel); position: sticky; top: 0; }
+  td.wrap { white-space: normal; min-width: 180px; }
+  tr.bad td { background: var(--bad-bg); }
+  tr.unverified td { color: var(--muted); }
+  tr.hit td { background: var(--warn-bg); }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+  .pill.ok { background: var(--ok-bg); color: var(--ok); }
+  .pill.bad { background: var(--bad-bg); color: var(--bad); }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .hidden { display: none; }
+  footer { color: var(--muted); font-size: 12px; margin-top: 32px; }
+  @media (max-width: 700px) { .inputs { grid-template-columns: 1fr; } }
+  @media print {
+    .no-print { display: none !important; }
+    body { background: #fff; color: #000; }
+    .scroll { overflow: visible; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Patrol <span>Report</span></h1>
+  <p class="lead">Verify and review guard tour logs recorded by the Patrol app on Flipper Zero.
+    Everything runs in this page: files and the site key never leave your computer.</p>
+
+  <section class="panel no-print">
+    <div class="inputs">
+      <div class="drop wide" id="drop">
+        <label for="logs">Log files <small>— log.csv (and archived log_N.csv) from SD:/apps_data/patrol</small></label>
+        <input type="file" id="logs" accept=".csv,text/csv" multiple>
+      </div>
+      <div>
+        <label for="key">Site key <small>— Admin → Show site key (64 hex digits)</small></label>
+        <input type="password" id="key" autocomplete="off" spellcheck="false" placeholder="e.g. 3f9a…">
+      </div>
+      <div>
+        <label for="receipt">Find a receipt <small>— code shown on the Flipper after a round</small></label>
+        <input type="text" id="receipt" autocomplete="off" spellcheck="false" placeholder="xxxx-xxxx">
+      </div>
+    </div>
+    <div class="actions">
+      <button id="verify">Verify &amp; build report</button>
+      <button class="secondary" id="export" disabled>Export rounds CSV</button>
+      <button class="secondary" id="print" disabled>Print / PDF</button>
+    </div>
+  </section>
+
+  <section id="results" class="hidden">
+    <h2>Verification</h2>
+    <div id="verdicts"></div>
+    <div class="cards" id="cards"></div>
+
+    <h2>Rounds</h2>
+    <div class="scroll"><table id="rounds"></table></div>
+
+    <h2>All events</h2>
+    <div class="scroll" style="max-height: 480px"><table id="events"></table></div>
+  </section>
+
+  <footer>
+    How it works: every record is signed with HMAC-SHA-256 over the previous record's signature and its
+    own content. Editing, deleting or reordering any line breaks every signature after it, and records
+    cannot be forged without the site key. The page cannot tell whether records were cut off at the
+    very end of the file: compare the last record number with the one on the Flipper.
+  </footer>
+</main>
+
+<script id="patrol-core">
+// ---- Core: parsing, HMAC chain verification, round building ----------------
+// Kept free of DOM access so tests can run it under Node.
+var PatrolCore = (function () {
+  "use strict";
+
+  var K = new Uint32Array([
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+  ]);
+
+  // SHA-256 of a Uint8Array. Plain JS rather than WebCrypto so the page also
+  // works from file:// in every browser and stays synchronous.
+  function sha256(bytes) {
+    var h = new Uint32Array([
+      0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+    ]);
+    var len = bytes.length;
+    var total = ((len + 9 + 63) >> 6) << 6;
+    var msg = new Uint8Array(total);
+    msg.set(bytes);
+    msg[len] = 0x80;
+    var bitsHi = Math.floor(len / 0x20000000);
+    var bitsLo = (len << 3) >>> 0;
+    var dv = new DataView(msg.buffer);
+    dv.setUint32(total - 8, bitsHi);
+    dv.setUint32(total - 4, bitsLo);
+    var w = new Uint32Array(64);
+    for (var off = 0; off < total; off += 64) {
+      for (var i = 0; i < 16; i++) w[i] = dv.getUint32(off + i * 4);
+      for (i = 16; i < 64; i++) {
+        var a15 = w[i - 15], a2 = w[i - 2];
+        var s0 = ((a15 >>> 7) | (a15 << 25)) ^ ((a15 >>> 18) | (a15 << 14)) ^ (a15 >>> 3);
+        var s1 = ((a2 >>> 17) | (a2 << 15)) ^ ((a2 >>> 19) | (a2 << 13)) ^ (a2 >>> 10);
+        w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+      }
+      var A = h[0], B = h[1], C = h[2], D = h[3], E = h[4], F = h[5], G = h[6], H = h[7];
+      for (i = 0; i < 64; i++) {
+        var S1 = ((E >>> 6) | (E << 26)) ^ ((E >>> 11) | (E << 21)) ^ ((E >>> 25) | (E << 7));
+        var ch = (E & F) ^ (~E & G);
+        var t1 = (H + S1 + ch + K[i] + w[i]) >>> 0;
+        var S0 = ((A >>> 2) | (A << 30)) ^ ((A >>> 13) | (A << 19)) ^ ((A >>> 22) | (A << 10));
+        var maj = (A & B) ^ (A & C) ^ (B & C);
+        var t2 = (S0 + maj) >>> 0;
+        H = G; G = F; F = E; E = (D + t1) >>> 0; D = C; C = B; B = A; A = (t1 + t2) >>> 0;
+      }
+      h[0] += A; h[1] += B; h[2] += C; h[3] += D; h[4] += E; h[5] += F; h[6] += G; h[7] += H;
+    }
+    var out = new Uint8Array(32);
+    var odv = new DataView(out.buffer);
+    for (i = 0; i < 8; i++) odv.setUint32(i * 4, h[i]);
+    return out;
+  }
+
+  function utf8(text) {
+    return new TextEncoder().encode(text);
+  }
+
+  function hmac(key, data) {
+    var block = new Uint8Array(64);
+    block.set(key.length > 64 ? sha256(key) : key);
+    var inner = new Uint8Array(64 + data.length);
+    var outer = new Uint8Array(64 + 32);
+    for (var i = 0; i < 64; i++) {
+      inner[i] = block[i] ^ 0x36;
+      outer[i] = block[i] ^ 0x5c;
+    }
+    inner.set(data, 64);
+    outer.set(sha256(inner), 64);
+    return sha256(outer);
+  }
+
+  function hex(bytes) {
+    var s = "";
+    for (var i = 0; i < bytes.length; i++) s += (bytes[i] < 16 ? "0" : "") + bytes[i].toString(16);
+    return s;
+  }
+
+  function parseKey(text) {
+    var clean = (text || "").replace(/[^0-9a-fA-F]/g, "");
+    if (clean.length !== 64) return null;
+    var key = new Uint8Array(32);
+    for (var i = 0; i < 32; i++) key[i] = parseInt(clean.substr(i * 2, 2), 16);
+    return key;
+  }
+
+  // Same as patrol_record_mac() on the Flipper
+  function recordMac(key, prevMac, body) {
+    return hex(hmac(key, utf8(prevMac + "\n" + body))).slice(0, 32);
+  }
+
+  var FIELDS = ["seq", "time", "event", "round", "checkpoint", "name", "tech", "uid", "detail", "mac"];
+
+  function parseLog(text, fileName) {
+    var records = [];
+    var lines = text.split(/\r?\n/);
+    for (var n = 0; n < lines.length; n++) {
+      var line = lines[n];
+      if (!line || line.indexOf("seq,") === 0) continue;
+      var parts = line.split(",");
+      var rec = { file: fileName || "", line: n + 1, raw: line, malformed: parts.length !== FIELDS.length };
+      FIELDS.forEach(function (f, i) { rec[f] = parts[i] !== undefined ? parts[i] : ""; });
+      rec.seq = parseInt(rec.seq, 10);
+      rec.round = parseInt(rec.round, 10) || 0;
+      rec.checkpoint = parseInt(rec.checkpoint, 10) || 0;
+      rec.body = line.slice(0, line.lastIndexOf(","));
+      records.push(rec);
+    }
+    return records;
+  }
+
+  // Marks every record ok / bad / unverified. Returns a summary.
+  function verify(records, key) {
+    var prev = "GENESIS";
+    var expected = 1;
+    var broken = null;
+    for (var i = 0; i < records.length; i++) {
+      var rec = records[i];
+      if (broken) {
+        rec.status = "unverified";
+        continue;
+      }
+      var reason = null;
+      if (rec.malformed) reason = "malformed line";
+      else if (rec.seq !== expected) reason = "expected record #" + expected + ", found #" + rec.seq;
+      else if (recordMac(key, prev, rec.body) !== rec.mac) reason = "signature mismatch";
+      if (reason) {
+        rec.status = "bad";
+        broken = { index: i, seq: rec.seq, line: rec.line, reason: reason };
+      } else {
+        rec.status = "ok";
+        prev = rec.mac;
+        expected++;
+      }
+    }
+    return {
+      total: records.length,
+      verified: broken ? broken.index : records.length,
+      broken: broken,
+      clockJumps: clockJumps(records),
+      lastSeq: records.length ? records[records.length - 1].seq : 0
+    };
+  }
+
+  // Signatures prove the records are genuine, not that the Flipper's clock
+  // was right. Time running backwards means the clock was changed.
+  function clockJumps(records) {
+    var jumps = [];
+    for (var i = 1; i < records.length; i++) {
+      if (records[i].time && records[i - 1].time && records[i].time < records[i - 1].time) {
+        jumps.push({ seq: records[i].seq, from: records[i - 1].time, to: records[i].time });
+      }
+    }
+    return jumps;
+  }
+
+  function detailField(detail, name) {
+    var m = new RegExp("(?:^| )" + name + "=([^ ]*)").exec(detail || "");
+    return m ? m[1] : "";
+  }
+
+  function receiptOf(mac) {
+    return mac ? mac.slice(0, 4) + "-" + mac.slice(4, 8) : "";
+  }
+
+  function buildRounds(records) {
+    var rounds = [];
+    var byNumber = {};
+    records.forEach(function (rec) {
+      if (!rec.round) return;
+      var r = byNumber[rec.round];
+      if (!r) {
+        r = byNumber[rec.round] = {
+          round: rec.round, device: "", start: "", end: "", duration: "", visited: "",
+          missed: [], issues: 0, unknown: 0, outOfOrder: 0, scans: 0, receipt: "",
+          finished: false, verified: true
+        };
+        rounds.push(r);
+      }
+      if (rec.status !== "ok") r.verified = false;
+      switch (rec.event) {
+        case "ROUND_START":
+          r.start = rec.time;
+          r.device = detailField(rec.detail, "device");
+          break;
+        case "SCAN":
+          r.scans++;
+          if (rec.detail === "out of order") r.outOfOrder++;
+          break;
+        case "ISSUE":
+          r.issues++;
+          break;
+        case "UNKNOWN":
+          r.unknown++;
+          break;
+        case "ROUND_END":
+          r.finished = true;
+          r.end = rec.time;
+          r.duration = detailField(rec.detail, "duration");
+          r.visited = detailField(rec.detail, "visited");
+          // "missed" is always last and its names may contain spaces
+          var at = (rec.detail || "").indexOf("missed=");
+          var missed = at >= 0 ? rec.detail.slice(at + 7) : "";
+          r.missed = missed && missed !== "none" ? missed.split("|") : [];
+          r.receipt = receiptOf(rec.mac);
+          break;
+      }
+    });
+    return rounds;
+  }
+
+  return {
+    sha256: sha256, hmac: hmac, hex: hex, utf8: utf8, parseKey: parseKey, recordMac: recordMac,
+    parseLog: parseLog, verify: verify, buildRounds: buildRounds, receiptOf: receiptOf
+  };
+})();
+if (typeof module !== "undefined") module.exports = PatrolCore;
+</script>
+
+<script>
+(function () {
+  "use strict";
+  if (typeof document === "undefined") return;
+
+  var files = [];
+  var lastRounds = [];
+  var $ = function (id) { return document.getElementById(id); };
+
+  function esc(text) {
+    return String(text).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  function readFiles(list) {
+    files = Array.prototype.slice.call(list);
+  }
+
+  $("logs").addEventListener("change", function (e) { readFiles(e.target.files); });
+  var drop = $("drop");
+  drop.addEventListener("dragover", function (e) { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", function () { drop.classList.remove("over"); });
+  drop.addEventListener("drop", function (e) {
+    e.preventDefault();
+    drop.classList.remove("over");
+    readFiles(e.dataTransfer.files);
+    $("logs").files = e.dataTransfer.files;
+  });
+
+  function card(value, label) {
+    return '<div class="card"><div class="v">' + esc(value) + '</div><div class="k">' + esc(label) + "</div></div>";
+  }
+
+  function clockHtml(name, summary) {
+    if (!summary.clockJumps || !summary.clockJumps.length) return "";
+    var first = summary.clockJumps[0];
+    return '<div class="verdict warn">⚠ ' + esc(name) + ": the Flipper's clock went back " +
+      summary.clockJumps.length + " time(s)<small>First at record #" + esc(first.seq) + ": " + esc(first.from) +
+      " → " + esc(first.to) + ". The records are genuine, but their times around this point may not be.</small></div>";
+  }
+
+  function verdictHtml(name, summary) {
+    if (!summary.total) {
+      return '<div class="verdict warn">' + esc(name) + ": no records<small>The file has no log records.</small></div>";
+    }
+    if (!summary.broken) {
+      return '<div class="verdict ok">✓ ' + esc(name) + ": all " + summary.total +
+        " records are authentic<small>Last record #" + summary.lastSeq +
+        ". It should match the record number the Flipper showed at the end of the last round.</small></div>";
+    }
+    return '<div class="verdict bad">✗ ' + esc(name) + ": tampering or wrong key at record #" +
+      esc(summary.broken.seq) + " (line " + summary.broken.line + ")<small>" + esc(summary.broken.reason) +
+      ". " + summary.verified + " record(s) before it are authentic; everything from there on cannot be trusted.</small></div>";
+  }
+
+  function render(allRecords, summaries) {
+    var receipt = $("receipt").value.trim().toLowerCase();
+    var rounds = PatrolCore.buildRounds(allRecords);
+    lastRounds = rounds;
+
+    $("verdicts").innerHTML = summaries.map(function (s) {
+      return verdictHtml(s.name, s.summary) + clockHtml(s.name, s.summary);
+    }).join("");
+
+    var finished = rounds.filter(function (r) { return r.finished; });
+    var complete = finished.filter(function (r) { return r.missed.length === 0; });
+    var issues = rounds.reduce(function (a, r) { return a + r.issues; }, 0);
+    var unknown = rounds.reduce(function (a, r) { return a + r.unknown; }, 0);
+    $("cards").innerHTML =
+      card(rounds.length, "Rounds") +
+      card(finished.length ? Math.round((complete.length / finished.length) * 100) + "%" : "–", "Complete rounds") +
+      card(issues, "Issues reported") +
+      card(unknown, "Unknown tags") +
+      card(allRecords.length, "Log records");
+
+    var head = "<tr><th>Round</th><th>Status</th><th>Start</th><th>End</th><th>Duration</th><th>Visited</th>" +
+      "<th>Missed</th><th>Issues</th><th>Out of order</th><th>Unknown</th><th>Device</th><th>Receipt</th></tr>";
+    $("rounds").innerHTML = head + rounds.map(function (r) {
+      var status = !r.verified ? '<span class="pill bad">not authentic</span>' :
+        !r.finished ? '<span class="pill warn">unfinished</span>' :
+        r.missed.length ? '<span class="pill warn">incomplete</span>' : '<span class="pill ok">complete</span>';
+      var hit = receipt && r.receipt === receipt.replace(/[^0-9a-f]/g, "").replace(/^(.{4})(.{4})$/, "$1-$2");
+      return '<tr class="' + (hit ? "hit" : "") + '"><td>' + r.round + "</td><td>" + status + "</td><td>" + esc(r.start) +
+        "</td><td>" + esc(r.end) + "</td><td>" + esc(r.duration) + "</td><td>" + esc(r.visited) +
+        '</td><td class="wrap">' + esc(r.missed.join(", ")) + "</td><td>" + r.issues + "</td><td>" + r.outOfOrder +
+        "</td><td>" + r.unknown + "</td><td>" + esc(r.device) + '</td><td class="mono">' + esc(r.receipt) + "</td></tr>";
+    }).join("");
+
+    var evHead = "<tr><th>#</th><th>File</th><th>Time</th><th>Event</th><th>Round</th><th>Checkpoint</th>" +
+      "<th>Tech</th><th>UID</th><th>Detail</th><th>Signature</th></tr>";
+    $("events").innerHTML = evHead + allRecords.map(function (rec) {
+      var cls = rec.status === "bad" ? "bad" : rec.status === "unverified" ? "unverified" : "";
+      var sig = rec.status === "ok" ? '<span class="pill ok">ok</span>' :
+        rec.status === "bad" ? '<span class="pill bad">broken</span>' : '<span class="pill warn">unverified</span>';
+      var cp = rec.checkpoint ? rec.checkpoint + ". " + rec.name : "";
+      return '<tr class="' + cls + '"><td>' + esc(isNaN(rec.seq) ? "?" : rec.seq) + "</td><td>" + esc(rec.file) + "</td><td>" + esc(rec.time) +
+        "</td><td>" + esc(rec.event) + "</td><td>" + (rec.round || "") + "</td><td>" + esc(cp) + "</td><td>" + esc(rec.tech) +
+        '</td><td class="mono">' + esc(rec.uid) + '</td><td class="wrap">' + esc(rec.detail) + "</td><td>" + sig + "</td></tr>";
+    }).join("");
+
+    $("results").classList.remove("hidden");
+    $("export").disabled = false;
+    $("print").disabled = false;
+  }
+
+  $("verify").addEventListener("click", function () {
+    var key = PatrolCore.parseKey($("key").value);
+    if (!key) {
+      alert("The site key must be 64 hex digits (Patrol → Admin → Show site key).");
+      return;
+    }
+    if (!files.length) {
+      alert("Choose log.csv first.");
+      return;
+    }
+    // Archived logs first (log_1, log_2, ...), the current log.csv last
+    var ordered = files.slice().sort(function (a, b) {
+      var na = /log_(\d+)\.csv$/.exec(a.name), nb = /log_(\d+)\.csv$/.exec(b.name);
+      return (na ? +na[1] : 1e9) - (nb ? +nb[1] : 1e9);
+    });
+    Promise.all(ordered.map(function (f) { return f.text(); })).then(function (texts) {
+      var all = [];
+      var summaries = [];
+      texts.forEach(function (text, i) {
+        // Each file is its own chain; archived logs used the previous key
+        var records = PatrolCore.parseLog(text, ordered[i].name);
+        summaries.push({ name: ordered[i].name, summary: PatrolCore.verify(records, key) });
+        all = all.concat(records);
+      });
+      render(all, summaries);
+    });
+  });
+
+  $("receipt").addEventListener("input", function () {
+    if (!$("results").classList.contains("hidden")) $("verify").click();
+  });
+
+  $("print").addEventListener("click", function () { window.print(); });
+
+  $("export").addEventListener("click", function () {
+    var rows = [["round", "status", "start", "end", "duration", "visited", "missed", "issues", "out_of_order", "unknown", "device", "receipt"]];
+    lastRounds.forEach(function (r) {
+      var status = !r.verified ? "not authentic" : !r.finished ? "unfinished" : r.missed.length ? "incomplete" : "complete";
+      rows.push([r.round, status, r.start, r.end, r.duration, r.visited, r.missed.join("; "), r.issues, r.outOfOrder, r.unknown, r.device, r.receipt]);
+    });
+    var csv = rows.map(function (row) {
+      return row.map(function (v) { v = String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(",");
+    }).join("\n");
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = "patrol-rounds.csv";
+    a.click();
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+diff --git a/assets/dolphin/external/manifest.txt b/assets/dolphin/external/manifest.txt
+index 951a4cd..d2ae105 100644
+--- a/assets/dolphin/external/manifest.txt
++++ b/assets/dolphin/external/manifest.txt
+@@ -245,3 +245,10 @@ Max butthurt: 13
+ Min level: 1
+ Max level: 3
+ Weight: 4
++
++Name: L1_FlipperOS_128x64
++Min butthurt: 0
++Max butthurt: 14
++Min level: 1
++Max level: 3
++Weight: 4

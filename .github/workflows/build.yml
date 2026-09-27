@@ -11,6 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        app: [flipper_os, patrol]
         sdk-channel: [release, dev]
     steps:
       - uses: actions/checkout@v4
@@ -19,11 +20,19 @@ jobs:
         id: build
         uses: flipperdevices/flipperzero-ufbt-action@v0.1
         with:
-          app-dir: flipper_os
+          app-dir: ${{ matrix.app }}
           sdk-channel: ${{ matrix.sdk-channel }}
 
       - name: Upload .fap
         uses: actions/upload-artifact@v4
         with:
-          name: flipper_os-${{ matrix.sdk-channel }}-${{ steps.build.outputs.suffix }}
+          name: ${{ matrix.app }}-${{ matrix.sdk-channel }}-${{ steps.build.outputs.suffix }}
           path: ${{ steps.build.outputs.fap-artifacts }}
+
+  patrol-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: HMAC and report verifier tests
+        run: tests/run_patrol_tests.sh

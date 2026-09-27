@@ -6,6 +6,11 @@
 
 #define COUNTDOWN_REFRESH_MS 200
 #define COUNTDOWN_MAX_SECONDS (99 * 60 + 59)
+// Ring for 30 seconds, then stay on "time is up" silently
+#define COUNTDOWN_ALARM_TICKS (30 * 1000 / COUNTDOWN_REFRESH_MS)
+
+// Long OK in setup cycles through these
+static const uint16_t countdown_presets_s[] = {60, 3 * 60, 5 * 60, 10 * 60, 15 * 60, 30 * 60, 60 * 60};
 
 typedef enum {
     CountdownStateSetup,
@@ -24,6 +29,9 @@ struct Countdown {
     FuriTimer* timer;
     NotificationApp* notifications;
     FlipperOsSettings* settings;
+    FlipperOsEventCallback event_callback;
+    void* event_context;
+    bool active; // view is on screen
 };
 
 typedef struct {
@@ -32,7 +40,7 @@ typedef struct {
     uint16_t preset_s; // value the user dialled in
     uint32_t remaining_ms; // valid while paused
     uint32_t deadline_tick; // valid while running
-    uint8_t alarm_ticks;
+    uint16_t alarm_ticks;
 } CountdownModel;
 
 static uint32_t countdown_remaining_ms(const CountdownModel* model) {
@@ -50,6 +58,13 @@ static uint32_t countdown_remaining_ms(const CountdownModel* model) {
 static void countdown_start_from(CountdownModel* model, uint32_t ms) {
     model->deadline_tick = furi_get_tick() + furi_ms_to_ticks(ms);
     model->state = CountdownStateRunning;
+}
+
+static uint16_t countdown_next_preset(uint16_t current) {
+    for(size_t i = 0; i < COUNT_OF(countdown_presets_s); i++) {
+        if(countdown_presets_s[i] > current) return countdown_presets_s[i];
+    }
+    return countdown_presets_s[0];
 }
 
 static void countdown_draw_callback(Canvas* canvas, void* _model) {
@@ -77,10 +92,11 @@ static void countdown_draw_callback(Canvas* canvas, void* _model) {
         // Underline the field being edited
         uint8_t x = model->field == CountdownFieldMinutes ? 38 : 70;
         canvas_draw_box(canvas, x, 38, 22, 2);
-        canvas_draw_str_aligned(canvas, 64, 46, AlignCenter, AlignCenter, "Arrows: set time");
+        canvas_draw_str_aligned(canvas, 64, 46, AlignCenter, AlignCenter, "Hold OK: presets");
         elements_button_center(canvas, "Start");
     } else if(model->state == CountdownStateAlarm) {
-        if(model->alarm_ticks % 2) {
+        // Blink while ringing, then keep the message steady
+        if(model->alarm_ticks >= COUNTDOWN_ALARM_TICKS || model->alarm_ticks % 2) {
             canvas_draw_str_aligned(canvas, 64, 46, AlignCenter, AlignCenter, "TIME IS UP!");
         }
         elements_button_center(canvas, "Stop");
@@ -97,7 +113,10 @@ static void countdown_draw_callback(Canvas* canvas, void* _model) {
 static bool countdown_input_callback(InputEvent* event, void* context) {
     Countdown* instance = context;
     if(event->key == InputKeyBack) return false;
-    if(event->type != InputTypeShort && event->type != InputTypeRepeat) return true;
+    bool is_long_ok = event->key == InputKeyOk && event->type == InputTypeLong;
+    if(event->type != InputTypeShort && event->type != InputTypeRepeat && !is_long_ok) {
+        return true;
+    }
 
     bool silence = false;
     with_view_model(
@@ -117,6 +136,8 @@ static bool countdown_input_callback(InputEvent* event, void* context) {
                     int32_t value = model->preset_s;
                     value += event->key == InputKeyUp ? step : -step;
                     model->preset_s = CLAMP(value, COUNTDOWN_MAX_SECONDS, 0);
+                } else if(is_long_ok) {
+                    model->preset_s = countdown_next_preset(model->preset_s);
                 } else if(event->key == InputKeyOk && is_short && model->preset_s > 0) {
                     countdown_start_from(model, model->preset_s * 1000);
                 }
@@ -152,6 +173,8 @@ static bool countdown_input_callback(InputEvent* event, void* context) {
 static void countdown_tick_callback(void* context) {
     Countdown* instance = context;
     bool alarm = false;
+    bool fired = false;
+    bool idle = false;
     with_view_model(
         instance->view,
         CountdownModel * model,
@@ -159,41 +182,78 @@ static void countdown_tick_callback(void* context) {
             if(model->state == CountdownStateRunning && countdown_remaining_ms(model) == 0) {
                 model->state = CountdownStateAlarm;
                 model->alarm_ticks = 0;
+                fired = true;
             }
-            if(model->state == CountdownStateAlarm) {
+            if(model->state == CountdownStateAlarm && model->alarm_ticks < COUNTDOWN_ALARM_TICKS) {
                 // Ring roughly once a second (every 5th refresh)
                 alarm = model->alarm_ticks % 5 == 0;
                 model->alarm_ticks++;
             }
+            idle = model->state != CountdownStateRunning &&
+                   !(model->state == CountdownStateAlarm &&
+                     model->alarm_ticks < COUNTDOWN_ALARM_TICKS);
         },
         true);
 
     if(alarm) notification_message(instance->notifications, &sequence_audiovisual_alert);
+    // Nothing left to do in the background once off screen
+    if(idle && !instance->active) furi_timer_stop(instance->timer);
+    // Pop up if the user is busy elsewhere in the toolkit
+    if(fired && !instance->active && instance->event_callback) {
+        instance->event_callback(instance->event_context, FlipperOsEventShowCountdown);
+    }
 }
 
 static void countdown_enter_callback(void* context) {
     Countdown* instance = context;
+    instance->active = true;
+    with_view_model(
+        instance->view,
+        CountdownModel * model,
+        {
+            // Pick up a reset done in Settings; never touch a live countdown
+            if(model->state == CountdownStateSetup) {
+                model->preset_s = MIN(instance->settings->timer_seconds, COUNTDOWN_MAX_SECONDS);
+            }
+        },
+        false);
     furi_timer_start(instance->timer, furi_ms_to_ticks(COUNTDOWN_REFRESH_MS));
 }
 
 static void countdown_exit_callback(void* context) {
     Countdown* instance = context;
-    // A running countdown keeps its deadline and catches up when reopened
-    furi_timer_stop(instance->timer);
+    instance->active = false;
+    bool running = false;
     with_view_model(
         instance->view,
         CountdownModel * model,
         {
+            // Leaving the screen acknowledges the alarm
             if(model->state == CountdownStateAlarm) model->state = CountdownStateSetup;
+            running = model->state == CountdownStateRunning;
             instance->settings->timer_seconds = model->preset_s;
         },
         false);
+    // A running countdown keeps ticking in the background so that it can
+    // still ring while the user is in another module
+    if(!running) furi_timer_stop(instance->timer);
     notification_message(instance->notifications, &sequence_reset_rgb);
+}
+
+void countdown_set_event_callback(
+    Countdown* instance,
+    FlipperOsEventCallback callback,
+    void* context) {
+    instance->event_callback = callback;
+    instance->event_context = context;
 }
 
 Countdown* countdown_alloc(FlipperOsSettings* settings) {
     Countdown* instance = malloc(sizeof(Countdown));
     instance->settings = settings;
+    instance->event_callback = NULL;
+    instance->event_context = NULL;
+    instance->active = false;
     instance->notifications = furi_record_open(RECORD_NOTIFICATION);
     instance->view = view_alloc();
     view_allocate_model(instance->view, ViewModelTypeLocking, sizeof(CountdownModel));
@@ -218,7 +278,9 @@ Countdown* countdown_alloc(FlipperOsSettings* settings) {
 
 void countdown_free(Countdown* instance) {
     furi_assert(instance);
+    furi_timer_stop(instance->timer);
     furi_timer_free(instance->timer);
+    notification_message(instance->notifications, &sequence_reset_rgb);
     view_free(instance->view);
     furi_record_close(RECORD_NOTIFICATION);
     free(instance);

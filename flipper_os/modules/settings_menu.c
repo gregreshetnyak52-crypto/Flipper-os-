@@ -10,7 +10,7 @@
 #define SETTINGS_STATUS_MS 1500
 
 static const char* const settings_item_names[SETTINGS_ITEMS_COUNT] = {
-    "Reset Snake best score",
+    "Reset records and stats",
     "Reset tally counter",
     "Reset all Toolkit data",
 };
@@ -33,6 +33,9 @@ static void settings_menu_apply(SettingsMenu* instance, uint8_t index) {
     switch(index) {
     case 0:
         settings->snake_best = 0;
+        settings->snake_best_walls = 0;
+        settings->reaction_best_ms = 0;
+        settings->pomodoro_total = 0;
         break;
     case 1:
         settings->counter_value = 0;
@@ -42,8 +45,8 @@ static void settings_menu_apply(SettingsMenu* instance, uint8_t index) {
         flipper_os_settings_defaults(settings);
         break;
     }
-    // Persist immediately: modules already open keep their own in-memory
-    // copy, so this only takes full effect the next time the app is opened.
+    // Modules re-read the settings whenever they are opened, so the reset
+    // is visible right away; persist it too in case the app is killed.
     flipper_os_settings_save(settings);
 }
 
@@ -92,7 +95,7 @@ static bool settings_menu_input_callback(InputEvent* event, void* context) {
             if(model->confirming) {
                 if(event->key == InputKeyOk) {
                     settings_menu_apply(instance, model->cursor);
-                    model->status = "Done. Reopen app to apply.";
+                    model->status = "Done.";
                     applied = true;
                 }
                 model->confirming = false;

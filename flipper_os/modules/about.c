@@ -39,11 +39,10 @@ static void about_draw_callback(Canvas* canvas, void* _model) {
     canvas_draw_str(canvas, 2, 51, line);
 
     const char* model = furi_hal_version_get_model_name();
-    snprintf(line, sizeof(line), "%s", model ? model : "Flipper Zero");
+    const char* name = furi_hal_version_get_name_ptr();
+    snprintf(
+        line, sizeof(line), "%s \"%s\"", model ? model : "Flipper Zero", name ? name : "?");
     canvas_draw_str(canvas, 2, 61, line);
-
-    canvas_draw_str_aligned(
-        canvas, 126, 61, AlignRight, AlignBottom, "github.com/gregreshetnyak52-crypto");
 }
 
 About* about_alloc(FlipperOsSettings* settings) {
