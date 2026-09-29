@@ -101,8 +101,12 @@ Unleashed»](#как-перенесены-функции-unleashed) ниже):
 
 ## Установка прошивки
 
-1. Скачайте `flipper-z-f7-update-flipperos-*.tgz` из артефактов workflow
-   **Build FlipperOS firmware** (вкладка *Actions*) или из *Releases*.
+1. Скачайте пакет обновления из *Releases* (или из артефактов workflow
+   **Build FlipperOS firmware** во вкладке *Actions*). Их два, как у Unleashed:
+   - `flipper-z-f7-update-flipperos-<версия>.tgz` — прошивка + **базовый пак
+     приложений** (то же, что в обычном релизе Unleashed);
+   - `flipper-z-f7-update-flipperos-<версия>e.tgz` — то же + **Extra-пак**
+     (все известные рабочие приложения сообщества, около 360 штук).
 2. В [qFlipper](https://flipperzero.one/update) нажмите
    **Install from file** и выберите этот `.tgz`.
 
@@ -120,7 +124,11 @@ git clone https://github.com/gregreshetnyak52-crypto/flipper-os-
 cd flipper-os-
 firmware/build.sh                  # → firmware/unleashed/dist/f7-C/*.tgz
 firmware/build.sh flash_usb_full   # собрать и сразу прошить по USB
+FLIPPEROS_PACK=extra firmware/build.sh   # с Extra-паком приложений
 ```
+
+`FLIPPEROS_PACK` выбирает приложения сообщества на SD-карте: `base`
+(по умолчанию), `extra` или `none` (только прошивка и наши приложения).
 
 Только приложение, под любую прошивку, через
 [ufbt](https://github.com/flipperdevices/flipperzero-ufbt):
@@ -149,6 +157,18 @@ FIRMWARE_APPS["default"].append("flipper_os")   # append, а не замена �
 `dangerous_settings` и прочее, описанное выше. Подробный список того, что
 именно добавлено сверху Unleashed, — в первом разделе этого README.
 
+**Приложения сообщества** (Sub-GHz bruteforce, анализатор спектра, ESP32 /
+NRF24 / GPS, игры и т. д.) в исходники Unleashed не входят: его релизы
+получают их отдельным шагом, копируя готовые паки из
+[xMasterX/all-the-plugins](https://github.com/xMasterX/all-the-plugins) на
+SD-карту вместе с обновлением. Сборка только из исходников даёт «clean»-вариант
+без них — именно так выглядел наш релиз v1.3. `firmware/build.sh` теперь делает
+тот же шаг: скачивает закреплённый релиз паков (версия и SHA-256 — в начале
+скрипта), кладёт их в пакет обновления, а CI проверяет
+(`firmware/tools/check_package.py`), что все файлы паков действительно
+оказались в итоговом `.tgz`. При обновлении Unleashed меняйте закреплённый
+релиз паков вместе с ним.
+
 ## Как устроен репозиторий
 
 ```
@@ -166,6 +186,7 @@ firmware/
 ├── patches/                *.patch к исходникам Unleashed (см. README там)
 │   └── 0001-flipperos-desktop-animation.patch   анимация в манифесте дельфина
 ├── tools/make_animation.py генератор кадров анимации (нужен Pillow)
+├── tools/check_package.py  проверка, что в .tgz есть паки приложений
 └── build.sh                сброс → патчи → overlay → приложения → ./fbt
 patrol/                     приложение Patrol (журнал обходов)
 companion/patrol-report.html  офлайн-проверка журналов Patrol

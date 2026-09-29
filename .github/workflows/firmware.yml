@@ -59,8 +59,28 @@ jobs:
             echo "DIST_SUFFIX=flipperos-${GITHUB_SHA::8}" >> "$GITHUB_ENV"
           fi
 
+      # Like Unleashed: the plain package carries the base app pack, the "e"
+      # package base + extra. Same firmware, the packs are SD card resources.
       - name: Build updater package
         run: firmware/build.sh
+
+      - name: Build updater package with the extra app pack
+        env:
+          DIST_SUFFIX: ${{ env.DIST_SUFFIX }}e
+          FLIPPEROS_PACK: extra
+        run: firmware/build.sh
+
+      - name: Verify the packages contain the app packs
+        run: |
+          python3 -m venv "$RUNNER_TEMP/check"
+          "$RUNNER_TEMP/check/bin/pip" install --quiet heatshrink2
+          check="$RUNNER_TEMP/check/bin/python firmware/tools/check_package.py"
+          dist=firmware/unleashed/dist/f7-C
+          cache=firmware/.cache
+          $check "$dist/flipper-z-f7-update-${DIST_SUFFIX}.tgz" \
+            --pack "$cache/all-the-apps-base.tgz"
+          $check "$dist/flipper-z-f7-update-${DIST_SUFFIX}e.tgz" \
+            --pack "$cache/all-the-apps-base.tgz" --pack "$cache/all-the-apps-extra.tgz"
 
       - name: Collect apps
         run: |
@@ -74,7 +94,7 @@ jobs:
           name: ${{ env.DIST_SUFFIX }}
           path: |
             firmware/unleashed/dist/f7-C/flipper-z-f7-update-*.tgz
-            firmware/unleashed/dist/f7-C/flipper-z-f7-full-*.dfu
+            firmware/unleashed/dist/f7-C/flipper-z-f7-full-${{ env.DIST_SUFFIX }}.dfu
             release-apps/*
 
       - name: Publish release
@@ -88,5 +108,5 @@ jobs:
           body_path: docs/releases/${{ env.RELEASE_TAG }}.md
           files: |
             firmware/unleashed/dist/f7-C/flipper-z-f7-update-*.tgz
-            firmware/unleashed/dist/f7-C/flipper-z-f7-full-*.dfu
+            firmware/unleashed/dist/f7-C/flipper-z-f7-full-${{ env.DIST_SUFFIX }}.dfu
             release-apps/*
