@@ -61,25 +61,33 @@ jobs:
 
       # Like Unleashed: the plain package carries the base app pack, the "e"
       # package base + extra. Same firmware, the packs are SD card resources.
+      # fbt empties dist/ at the start of every run, so each build's results
+      # are copied to out/ right away.
       - name: Build updater package
-        run: firmware/build.sh
+        run: |
+          firmware/build.sh
+          mkdir -p out
+          cp firmware/unleashed/dist/f7-C/flipper-z-f7-update-*.tgz \
+             firmware/unleashed/dist/f7-C/flipper-z-f7-full-*.dfu out/
 
       - name: Build updater package with the extra app pack
         env:
           DIST_SUFFIX: ${{ env.DIST_SUFFIX }}e
           FLIPPEROS_PACK: extra
-        run: firmware/build.sh
+        run: |
+          firmware/build.sh
+          cp firmware/unleashed/dist/f7-C/flipper-z-f7-update-*.tgz out/
 
       - name: Verify the packages contain the app packs
         run: |
           python3 -m venv "$RUNNER_TEMP/check"
           "$RUNNER_TEMP/check/bin/pip" install --quiet heatshrink2
           check="$RUNNER_TEMP/check/bin/python firmware/tools/check_package.py"
-          dist=firmware/unleashed/dist/f7-C
+          ls -l out
           cache=firmware/.cache
-          $check "$dist/flipper-z-f7-update-${DIST_SUFFIX}.tgz" \
+          $check "out/flipper-z-f7-update-${DIST_SUFFIX}.tgz" \
             --pack "$cache/all-the-apps-base.tgz"
-          $check "$dist/flipper-z-f7-update-${DIST_SUFFIX}e.tgz" \
+          $check "out/flipper-z-f7-update-${DIST_SUFFIX}e.tgz" \
             --pack "$cache/all-the-apps-base.tgz" --pack "$cache/all-the-apps-extra.tgz"
 
       - name: Collect apps
@@ -93,8 +101,7 @@ jobs:
         with:
           name: ${{ env.DIST_SUFFIX }}
           path: |
-            firmware/unleashed/dist/f7-C/flipper-z-f7-update-*.tgz
-            firmware/unleashed/dist/f7-C/flipper-z-f7-full-${{ env.DIST_SUFFIX }}.dfu
+            out/*
             release-apps/*
 
       - name: Publish release
@@ -107,6 +114,5 @@ jobs:
           name: FlipperOS ${{ env.RELEASE_TAG }}
           body_path: docs/releases/${{ env.RELEASE_TAG }}.md
           files: |
-            firmware/unleashed/dist/f7-C/flipper-z-f7-update-*.tgz
-            firmware/unleashed/dist/f7-C/flipper-z-f7-full-${{ env.DIST_SUFFIX }}.dfu
+            out/*
             release-apps/*
